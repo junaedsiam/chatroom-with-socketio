@@ -5,12 +5,6 @@
 /**
  * DOM CODE
  */
-/**
- * TODO:
- * 1. Add location sharing feature to the chat
- * 2. Clean up code
- * 3. Rewrite & restructure some repetition
- */
 const socket = io();
 const userInput = document.getElementById('userInput');
 const sendMsgBtn = document.getElementById('sendMsgBtn');
@@ -18,68 +12,87 @@ const sendLocationBtn = document.getElementById('sendLocationBtn');
 const chatTemplate = document.getElementById('template');
 const chatContainer = document.getElementById('chatContainer');
 
-function sendMessageToServer(qs, msg) {
-  const now = new Date();
-  const time = moment(now).format('h:mm a');
-  socket.emit('userMessage', { qs, msg, time }, (delivered) => {
-    if (!delivered) {
-      return alert('something went wrong');
-    }
-  });
+function getCurrentTime() {
+  const today = new Date();
+  return moment(today).format('hh:mm a');
 }
 
-function sendUserLocationToChannel() {
-  const qs = location.search;
-  const isUserNameExist = qs.search(/(username=)\w+/) === 1 ? 1 : false;
-  if (!navigator.geolocation) {
-    return alert('Sorry ! Unfortunately your browser does not support GEOLOCATION API');
-  }
-  if (!isUserNameExist) {
-    return alert('please provide a username');
-  }
-  navigator.geolocation.getCurrentPosition((position) => {
-    const { latitude, longitude } = position.coords;
-    socket.emit('userLocation', { qs, latitude, longitude }, (delivered) => {
+// Reusable function
+function sendDataToServer(socketEvent, data) {
+  return new Promise((resolve, reject) => {
+    socket.emit(socketEvent, data, (delivered) => {
       if (!delivered) {
-        return alert('something went wrong');
+        return reject(new Error('Internal Server Error'));
       }
+      resolve();
     });
   });
 }
 
-function prepareMessageAndSend() {
-  const msg = userInput.value;
-  const qs = location.search;
-  const isUserNameExist = qs.search(/(username=)\w+/) === 1 ? 1 : false;
-  if (!isUserNameExist) {
-    return alert('please provide a username');
-  }
-  if (!msg) {
-    return alert('please type in a message to send');
-  }
-  sendMessageToServer(qs, msg);
+function isUserNameExist(queryString) {
+  return queryString.search(/(username=)\w+/) === 1 ? 1 : false;
 }
 
-sendMsgBtn.addEventListener('click', prepareMessageAndSend);
+function generateChatUi(msgObj) {
+  const messageView = Mustache.render(chatTemplate.innerHTML, msgObj);
+  chatContainer.insertAdjacentHTML('beforeend', messageView);
+  // This is for keeping the chat container at the bottom of the div
+  chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+function sendUserLocationToChannel() {
+  try {
+    const qs = location.search;
+    if (!navigator.geolocation) {
+      throw new Error('Sorry ! Unfortunately your browser does not support GEOLOCATION API');
+    }
+    if (!isUserNameExist(qs)) {
+      throw new Error('please provide a username');
+    }
+    navigator.geolocation.getCurrentPosition(async (position) => {
+      const { latitude, longitude } = position.coords;
+      await sendDataToServer('userLocation', { qs, latitude, longitude });
+    });
+  } catch (err) {
+    alert(err);
+  }
+}
+
+async function sendUserMessageToChannel() {
+  try {
+    const message = userInput.value;
+    const qs = location.search;
+    if (!isUserNameExist(qs)) {
+      throw new Error('please provide a username');
+    }
+    if (!message) {
+      throw new Error('please type in a message to send');
+    }
+    await sendDataToServer('userMessage', { qs, message });
+    userInput.value = '';
+  } catch (err) {
+    alert(err);
+  }
+}
+
+sendMsgBtn.addEventListener('click', sendUserMessageToChannel);
 sendLocationBtn.addEventListener('click', sendUserLocationToChannel);
 
 /**
  * SOCKET CODE
  */
-socket.on('channelMessage', (msgObj) => {
-  const { username, msg, time } = msgObj;
-  const messageView = Mustache.render(chatTemplate.innerHTML, { username, message: msg, time });
-  chatContainer.insertAdjacentHTML('beforeend', messageView);
-  // This is for keeping the chat container at the bottom of the div
-  chatContainer.scrollTop = chatContainer.scrollHeight;
+socket.on('channelMessage', (obj) => {
+  const finalObj = {
+    ...obj,
+    time: getCurrentTime(),
+  };
+  generateChatUi(finalObj);
 });
 
-socket.on('channelLocation', (msgObj) => {
-  const { username, latitude, longitude } = msgObj;
-  const now = new Date();
-  const time = moment(now).format('h:mm a');
-  const messageView = Mustache.render(chatTemplate.innerHTML, { username, location: msg, time });
-  chatContainer.insertAdjacentHTML('beforeend', messageView);
-  // This is for keeping the chat container at the bottom of the div
-  chatContainer.scrollTop = chatContainer.scrollHeight;
+socket.on('channelLocation', (obj) => {
+  const finalObj = {
+    ...obj,
+    time: getCurrentTime(),
+  };
+  generateChatUi(finalObj);
 });

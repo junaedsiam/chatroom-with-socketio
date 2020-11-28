@@ -1,14 +1,8 @@
-/**
- * TODO:
- * 1. Add location sharing feature to the chat
- * 2. Clean up code
- * 3. Rewrite & restructure some repetition
- */
 const express = require('express');
 const http = require('http');
 const path = require('path');
 const socketio = require('socket.io');
-const qs = require('qs');
+const { getUserName } = require('./helper');
 
 const app = express();
 const PORT = 3000;
@@ -24,23 +18,21 @@ app.get('/', (req, res) => {
 io.on('connection', (socket) => {
   socket.emit('message', 'Welcome user!');
   socket.broadcast.emit('new-user', 'A new user has joined');
-  // socket.on('sendLocation', ({ latitude, longitude }) => {
-  //   socket.broadcast.emit('user-location',
-  //     `https://www.google.com/maps/@${latitude},${longitude},20z`);
-  // });
   socket.on('userMessage', (obj, callback) => {
-    const { username } = qs.parse(obj.qs, { ignoreQueryPrefix: true });
-    const { msg, time } = obj;
-    io.emit('channelMessage', { username, msg, time });
+    const { username } = getUserName(obj.qs);
+    const { message } = obj;
+    io.emit('channelMessage', { username, message });
     callback('Delivered!');
   });
   socket.on('userLocation', (obj, callback) => {
-    const { username } = qs.parse(obj.qs, { ignoreQueryPrefix: true });
+    const { username } = getUserName(obj.qs);
     const { latitude, longitude } = obj;
-    io.emit('channelLocation', { username, latitude, longitude });
+    const location = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+    io.emit('channelLocation', { username, location });
     callback('Delivered');
   });
 });
+
 server.listen(PORT, () => {
   console.log(`App is listening to port: ${PORT}`);
 });
