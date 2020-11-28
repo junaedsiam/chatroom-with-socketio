@@ -2,8 +2,9 @@
 /* eslint-disable no-restricted-globals */
 /* eslint-disable no-alert */
 /* eslint-disable no-undef */
+
 /**
- * DOM CODE
+ * DOM SELECTION
  */
 const socket = io();
 const userInput = document.getElementById('userInput');
@@ -12,12 +13,9 @@ const sendLocationBtn = document.getElementById('sendLocationBtn');
 const chatTemplate = document.getElementById('template');
 const chatContainer = document.getElementById('chatContainer');
 
-function getCurrentTime() {
-  const today = new Date();
-  return moment(today).format('hh:mm a');
-}
-
-// Reusable function
+/**
+ * REUSABLE FUNCTIONS
+ */
 function sendDataToServer(socketEvent, data) {
   return new Promise((resolve, reject) => {
     socket.emit(socketEvent, data, (delivered) => {
@@ -39,6 +37,15 @@ function generateChatUi(msgObj) {
   // This is for keeping the chat container at the bottom of the div
   chatContainer.scrollTop = chatContainer.scrollHeight;
 }
+
+function getCurrentTime() {
+  const today = new Date();
+  return moment(today).format('hh:mm a');
+}
+
+/**
+ * APPLICATION CODE
+ */
 
 function sendUserLocationToChannel() {
   try {
